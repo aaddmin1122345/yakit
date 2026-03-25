@@ -372,6 +372,16 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         name: t('ProjectManage.description'),
         style: { flex: 1 },
         render: (data) => {
+          if (data?.ProjectName === '[default]') {
+            return (
+              <Tooltip title={'默认数据库'}>
+                <div style={{ overflow: 'hidden' }} className={'yakit-content-single-ellipsis'}>
+                  默认数据库
+                </div>
+              </Tooltip>
+            )
+          }
+
           try {
             const arr: { Key: string; Value: string }[] = JSON.parse(data.Description)
             let str = ''

@@ -25,11 +25,13 @@ const TitleBar: FC = () => {
   const [isMaximized, setIsMaximized] = useState(false)
   const [icons, setIcons] = useState<IconSet | null>(null)
   const [isDarwin, setIsDarwin] = useState(true)
+  const [systemName, setSystemName] = useState<string>('')
 
   useEffect(() => {
     const fetchIcons = async () => {
       try {
         const systemName = await yakitSystem.fetchSystemName()
+        setSystemName(systemName)
         const isMac = systemName === 'Darwin'
         setIsDarwin(isMac)
         setIcons(
@@ -79,13 +81,15 @@ const TitleBar: FC = () => {
   }
 
   if (!icons) return null
+  if (!systemName) return null
+  if (systemName === 'Linux') return null
 
   return (
     <div className={styles.header} onDoubleClick={handleDoubleClick}>
       <div
         className={classNames(styles.icons, {
           [styles['icons-darwin']]: isDarwin,
-          [styles['icons-win']]: !isDarwin,
+          [styles['icons-win']]: systemName === 'Windows_NT',
         })}
       >
         {isDarwin ? (

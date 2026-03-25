@@ -1790,10 +1790,12 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
                       </>
                     )}
                   </div>
-                  <WinUIOp
-                    currentProjectId={currentProject?.Id ? currentProject?.Id + '' : ''}
-                    pageChildrenShow={pageShowHome}
-                  />
+                  {system === 'Windows_NT' && (
+                    <WinUIOp
+                      currentProjectId={currentProject?.Id ? currentProject?.Id + '' : ''}
+                      pageChildrenShow={pageShowHome}
+                    />
+                  )}
                 </div>
               </div>
             )}
