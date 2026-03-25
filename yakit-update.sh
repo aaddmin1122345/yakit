@@ -3,12 +3,6 @@ set -euo pipefail
 
 # ==============================================================================
 # Yakit update script (fork workflow + Audit)
-#
-# 目标：
-#   1) 自动检测官方是否修改了你维护的敏感文件
-#   2) base 分支始终对齐官方 yaklang/yakit 最新 release tag
-#   3) my-yakit 分支在 base 之上 rebase（叠加你的改动）
-#   4) 下载引擎/插件并执行打包
 # ==============================================================================
 
 # ---- Local paths -------------------------------------------------------------
@@ -68,10 +62,8 @@ get_latest_release_tag() {
   rm -f "$tmp"
 }
 
-# 核心审计函数：对比旧 base 和新 Tag 之间的文件差异
 check_sensitive_modifications() {
   local new_tag="$1"
-  # 你维护的敏感文件列表
   local sensitive_files=(
     "app/main/index.js"
     "app/renderer/src/main/src/components/BaseTitleBar/index.tsx"
@@ -84,10 +76,8 @@ check_sensitive_modifications() {
   local found_change=0
 
   for file in "${sensitive_files[@]}"; do
-    # 检查当前本地 base 分支和即将更新的 tag 之间的差异
     if ! git diff --quiet "base..$new_tag" -- "$file" 2>/dev/null; then
       warn "检测到官方修改了敏感文件: $file"
-      # 显示官方的具体提交简述，方便你判断
       git log --oneline --color "base..$new_tag" -- "$file" | sed 's/^/    - /'
       found_change=1
     fi
@@ -125,7 +115,7 @@ push_my_branch() {
 }
 
 # ==============================================================================
-# Yak engine helpers (保持原逻辑)
+# Yak engine & Chrome helpers
 # ==============================================================================
 select_default_yak_release_json() {
   local tmp
@@ -175,25 +165,15 @@ download_yak_engine() {
   curl -fL -A "$UA" "$asset_url" -o "$tmp_dir/yak_linux_amd64"
   chmod +x "$tmp_dir/yak_linux_amd64"
 
-  # 1) 写入本机运行时引擎目录
   command cp -f "$tmp_dir/yak_linux_amd64" "$PROJECT_PATH/yak-engine/yak"
-
-  # 2) 生成打包用 zip
-  mkdir -p "$tmp_dir/bins"  # <-- 关键修复点
+  mkdir -p "$tmp_dir/bins"
   command mv -f "$tmp_dir/yak_linux_amd64" "$tmp_dir/bins/yak_linux_amd64"
-
-  # 在临时目录下进行 zip 打包
   (cd "$tmp_dir" && zip -9 -r out.zip bins/yak_linux_amd64 >/dev/null)
-
-  # 将结果移回项目根目录的 bins
   mkdir -p bins
   command mv -f "$tmp_dir/out.zip" "bins/yak_linux_amd64.zip"
   echo "$tag" > bins/engine-version.txt
 }
 
-# ==============================================================================
-# Chrome & Build helpers (保持原逻辑)
-# ==============================================================================
 download_chrome_extension() {
   local chrome_tag="$1"
   mkdir -p bins/scripts
@@ -202,6 +182,9 @@ download_chrome_extension() {
     -o "bins/scripts/google-chrome-plugin.zip"
 }
 
+# ==============================================================================
+# Build helpers (沿用你之前的逻辑)
+# ==============================================================================
 build_if_renderer_changed() {
   if git diff --name-only base..HEAD | grep -q '^app/renderer/'; then
     step "Renderer 发生变化，执行构建..."
@@ -228,6 +211,11 @@ main() {
   for c in git curl python3 zip unzip yarn; do need "$c"; done
   ensure_clean_worktree
 
+  # --- 关键：编译前环境补全 ---
+  # 既然报错找不到 run-s，说明 node_modules 还没装。只需运行一次这个。
+  step "检查 Node 环境依赖..."
+  yarn install
+
   step "[0/6] 拉取远端仓库最新信息..."
   git_fetch_all
 
@@ -237,7 +225,6 @@ main() {
   [[ -n "$yakit_tag" ]] || fail "无法获取 Tag 名称"
   info "[Yakit] Latest Tag: $yakit_tag"
 
-  # --- 审计步骤：这是你最需要的监控功能 ---
   check_sensitive_modifications "$yakit_tag"
 
   step "[2/6] 将 base 分支对齐到官方新版本"
@@ -263,12 +250,12 @@ main() {
   sep
 
   step "[Build] 开始构建流程"
+  # 这里依然用你原本的 build 逻辑
   build_if_renderer_changed
   pack_linux
 
   cleanup_appimage
   ok "Yakit 更新并构建成功！"
-  info "现在可以运行 ./yakit.sh 启动隔离环境下的 Yakit 了。"
 }
 
 main "$@"
