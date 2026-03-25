@@ -175,10 +175,18 @@ download_yak_engine() {
   curl -fL -A "$UA" "$asset_url" -o "$tmp_dir/yak_linux_amd64"
   chmod +x "$tmp_dir/yak_linux_amd64"
 
+  # 1) 写入本机运行时引擎目录
   command cp -f "$tmp_dir/yak_linux_amd64" "$PROJECT_PATH/yak-engine/yak"
-  mkdir -p bins
+
+  # 2) 生成打包用 zip
+  mkdir -p "$tmp_dir/bins"  # <-- 关键修复点
   command mv -f "$tmp_dir/yak_linux_amd64" "$tmp_dir/bins/yak_linux_amd64"
+
+  # 在临时目录下进行 zip 打包
   (cd "$tmp_dir" && zip -9 -r out.zip bins/yak_linux_amd64 >/dev/null)
+
+  # 将结果移回项目根目录的 bins
+  mkdir -p bins
   command mv -f "$tmp_dir/out.zip" "bins/yak_linux_amd64.zip"
   echo "$tag" > bins/engine-version.txt
 }
