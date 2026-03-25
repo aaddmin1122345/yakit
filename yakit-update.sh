@@ -214,7 +214,7 @@ main() {
   # --- 关键：编译前环境补全 ---
   # 既然报错找不到 run-s，说明 node_modules 还没装。只需运行一次这个。
   step "检查 Node 环境依赖..."
-  yarn install
+  # yarn install
 
   step "[0/6] 拉取远端仓库最新信息..."
   git_fetch_all
