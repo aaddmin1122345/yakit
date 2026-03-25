@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-# 1. 确保路径鲁棒性
+# 1. 路径锁定
+# 必须先跳进你的项目根目录，否则 ./release/linux-unpacked/yakit 会报找不到文件
 SCRIPT_REAL="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_REAL")"
 cd "$SCRIPT_DIR"
 
-# 2. 环境变量配置
-# 使用默认值赋值，允许外部临时覆盖 YAKIT_HOME
-export YAKIT_HOME="$HOME/.local/share/yakit"
-# 针对 AMD 驱动在 Wayland 下的显示优化
+# 2. 核心路径配置 (与你的 update 脚本保持一致)
+# 真实数据存放地
+YAKIT_STORAGE="$HOME/.local/share/yakit"
+# 软件硬编码想要生成的“屎路径”
+SHIT_PATH="$HOME/yakit-projects"
+
+# 3. 环境变量 (针对 AMD 680M + Wayland 优化)
 export NVD_BACKEND=direct
 
-# 3. 启动参数优化
-exec "$SCRIPT_DIR/release/linux-unpacked/yakit" \
+# 4. 执行 bwrap
+# --dev-bind / / : 共享系统环境（驱动、库、字体）
+# --bind "$YAKIT_STORAGE" "$SHIT_PATH" : 魔法重定向
+exec bwrap \
+    --dev-bind / / \
+    --bind "$YAKIT_STORAGE" "$SHIT_PATH" \
+    --setenv YAKIT_HOME "$YAKIT_STORAGE" \
+    --setenv XDG_RUNTIME_DIR "/run/user/$(id -u)" \
+    "./release/linux-unpacked/yakit" \
+    --no-sandbox \
     --ozone-platform-hint=wayland \
     --enable-wayland-ime \
     --ignore-gpu-blocklist \
