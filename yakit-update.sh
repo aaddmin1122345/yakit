@@ -48,8 +48,11 @@ curl_json_to_file() {
 # Git 辅助函数
 # ==============================================================================
 ensure_clean_worktree() {
-  echo "skip"
-  # git diff --quiet && git diff --cached --quiet || fail "工作区不干净，请先提交或 stash 你的改动"
+  if [[ "${YAKIT_SKIP_CLEAN_CHECK:-0}" == "1" ]]; then
+      warn "已跳过工作区检查 (YAKIT_SKIP_CLEAN_CHECK=1)"
+      return 0
+  fi
+  git diff --quiet && git diff --cached --quiet || fail "工作区不干净，请先提交或 stash 你的改动；或临时设置 YAKIT_SKIP_CLEAN_CHECK=1"
 }
 
 git_fetch_all() {
@@ -69,21 +72,33 @@ get_latest_release_tag() {
 # 敏感文件审计：在对齐 base 之前检查官方是否动了你的核心逻辑
 check_sensitive_modifications() {
     local new_tag="$1"
+    local new_tag_ref="refs/tags/$new_tag"
     local sensitive_files=(
-        "app/main/index.js"
+        # 开启系统自带标题栏
+        "app/main/index.js" 
+        # 这个应该是双击流量出现的界面，只有Windiws才开启winUI
         "app/renderer/src/main/src/components/BaseTitleBar/index.tsx"
+        # 判断系统是否是windwos，只有Windows才开启winUI
         "app/renderer/src/main/src/components/layout/UILayout.tsx"
+        # 修改首页默认项目备注
         "app/renderer/src/main/src/pages/softwareSettings/ProjectManage.tsx"
+        # 自己项目的说明
         "README.md"
     )
+
+    if ! git rev-parse -q --verify "refs/heads/base" >/dev/null; then
+        warn "未找到本地 base 分支，跳过敏感文件审计（首次运行可忽略）。"
+        return 0
+    fi
+    git rev-parse -q --verify "$new_tag_ref" >/dev/null || fail "tag 不存在：$new_tag"
 
     info "正在审计官方更新是否触及敏感文件..."
     local found_change=0
 
     for file in "${sensitive_files[@]}"; do
-        if ! git diff --quiet "base..$new_tag" -- "$file" 2>/dev/null; then
+        if ! git diff --quiet "base..$new_tag_ref" -- "$file"; then
             warn "检测到官方修改了敏感文件: $file"
-            git log --oneline --color "base..$new_tag" -- "$file" | sed 's/^/    - /'
+            git log --oneline --color "base..$new_tag_ref" -- "$file" | sed 's/^/    - /'
             found_change=1
         fi
     done
