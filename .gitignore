@@ -60,4 +60,8 @@ yarn.lock
 .history/
 .serena/
 .ci-changed-files-list.txt
+<<<<<<< HEAD
 pr-ci-changed-files-list.txt
+=======
+.codex
+>>>>>>> f8bcc5ae6 (codex修复主题同步问题)
