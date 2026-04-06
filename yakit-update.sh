@@ -214,7 +214,7 @@ cleanup_release_artifacts() {
         ./release/*.AppImage \
         ./release/builder-debug.yml \
         ./release/builder-effective-config.yaml
-    ok "已清理 arm64 与构建残留文件。"
+    # ok "已清理 arm64 与构建残留文件。"
 }
 
 copy_system_mode_file() {
@@ -224,7 +224,7 @@ copy_system_mode_file() {
     [[ -f "$src" ]] || fail "缺少文件：$src"
     mkdir -p "$target_dir"
     command cp -f "$src" "$target_dir/"
-    ok "已补充 system mode 文件到 linux-unpacked。"
+    # ok "已补充 system mode 文件到 linux-unpacked。"
 }
 
 pack_linux() {
