@@ -205,14 +205,34 @@ build_if_renderer_changed() {
     fi
 }
 
-pack_linux() {
-    step "执行打包流程..."
-    yarn pack-linux
+cleanup_release_artifacts() {
+    rm -rf \
+        ./release/linux-arm64-unpacked \
+        ./release/.icon-set
+    rm -f \
+        ./release/*-linux-arm64.yml \
+        ./release/*.AppImage \
+        ./release/builder-debug.yml \
+        ./release/builder-effective-config.yaml
+    ok "已清理 arm64 与构建残留文件。"
 }
 
-cleanup_appimage() {
-    rm -rf ./release/*.AppImage
-    ok "清理完成。"
+copy_system_mode_file() {
+    local src="bins/yakit-system-mode.txt"
+    local target_dir="./release/linux-unpacked/bins"
+
+    [[ -f "$src" ]] || fail "缺少文件：$src"
+    mkdir -p "$target_dir"
+    command cp -f "$src" "$target_dir/"
+    ok "已补充 system mode 文件到 linux-unpacked。"
+}
+
+pack_linux() {
+    step "执行正常版 Linux x64 打包..."
+    [[ -x ./node_modules/.bin/env-cmd ]] || fail "缺少依赖：./node_modules/.bin/env-cmd，请先执行 yarn"
+    [[ -x ./node_modules/.bin/electron-builder ]] || fail "缺少依赖：./node_modules/.bin/electron-builder，请先执行 yarn"
+    ./node_modules/.bin/env-cmd -e nonSignNormal -r packageScript/.env-cmdrc \
+        ./node_modules/.bin/electron-builder build --linux AppImage --x64 --config ./packageScript/electron-builder.config.js
 }
 
 # ==============================================================================
@@ -265,10 +285,12 @@ main() {
     sep
 
     step "[Build] 开始构建流程"
+    cleanup_release_artifacts
     build_if_renderer_changed
     pack_linux
+    copy_system_mode_file
 
-    cleanup_appimage
+    cleanup_release_artifacts
     ok "Yakit 更新并构建成功！"
 }
 
