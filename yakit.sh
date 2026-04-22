@@ -16,15 +16,57 @@ REAL_HOME="$HOME"
 REAL_DATA="$REAL_HOME/.local/share/yakit-projects"
 mkdir -p "$REAL_DATA"
 
-# 临时 HOME 只给 yakit 进程用，宿主机真实 HOME 不变。
-FAKE_HOME="$(mktemp -d)"
-cleanup() {
-  rm -rf "$FAKE_HOME"
-}
-trap cleanup EXIT INT TERM
+# 这里不能再用随机 mktemp。
+# 程序和引擎会把绝对路径持久化；如果每次启动 HOME 都变成不同的 /tmp/tmp.xxx，
+# 下一次再打开旧项目时就会指向失效路径。改成固定的 fake HOME，路径才能稳定。
+FAKE_HOME_BASE="${XDG_RUNTIME_DIR:-/tmp}"
+FAKE_HOME="$FAKE_HOME_BASE/yakit-home-${USER:-$(id -u)}"
 
-# 让程序眼中的 ~/yakit-projects 实际落到 ~/.local/share/yakit-projects。
-ln -s "$REAL_DATA" "$FAKE_HOME/yakit-projects"
+ensure_project_link() {
+  local home_dir="$1"
+  local link_path="$home_dir/yakit-projects"
+
+  mkdir -p "$home_dir"
+  if [[ -L "$link_path" ]]; then
+    local link_target
+    link_target="$(readlink -f "$link_path")"
+    [[ "$link_target" == "$REAL_DATA" ]] || {
+      echo "error: $link_path 已存在，但未指向 $REAL_DATA" >&2
+      exit 1
+    }
+    return 0
+  fi
+
+  if [[ -e "$link_path" ]]; then
+    echo "error: $link_path 已存在且不是符号链接，请手动处理后再启动" >&2
+    exit 1
+  fi
+
+  ln -s "$REAL_DATA" "$link_path"
+}
+
+restore_legacy_tmp_links() {
+  local log_root="$REAL_DATA"
+  local legacy_paths=()
+  local source_dirs=()
+
+  [[ -d "$log_root/engine-log" ]] && source_dirs+=("$log_root/engine-log")
+  [[ -d "$log_root/print-log" ]] && source_dirs+=("$log_root/print-log")
+  [[ ${#source_dirs[@]} -eq 0 ]] && return 0
+
+  mapfile -t legacy_paths < <(
+    grep -RhoE '/tmp/tmp\.[^/]+/yakit-projects' "${source_dirs[@]}" 2>/dev/null | sort -u
+  )
+
+  local legacy_path legacy_home
+  for legacy_path in "${legacy_paths[@]}"; do
+    legacy_home="${legacy_path%/yakit-projects}"
+    ensure_project_link "$legacy_home"
+  done
+}
+
+ensure_project_link "$FAKE_HOME"
+restore_legacy_tmp_links
 
 # 只映射主题相关路径，避免把整份 ~/.config 和 ~/.local/share 带进去，
 # 否则 Electron/Chromium 的配置与 GPU 缓存也会被复用，容易把渲染路径搞坏。
@@ -78,7 +120,8 @@ YAKIT_FLAGS+=(
   "--enable-features=WaylandWindowDecorations,CanvasOopRasterization,OverlayScrollbars,WebRTCPipeWireCapturer,VaapiIgnoreDriverChecks,AcceleratedVideoEncoder,AcceleratedVideoDecodeLinuxZeroCopyGL"
 )
 
-# 只对 yakit 进程注入临时 HOME，真实数据目录仍然是 ~/.local/share/yakit-projects。
+# HOME 固定指向稳定的 fake HOME；这样程序里看到的 ~/yakit-projects 是固定路径，
+# 但真实数据仍然通过符号链接落在 ~/.local/share/yakit-projects。
 HOME="$FAKE_HOME" \
 XDG_CONFIG_HOME="$FAKE_HOME/.config" \
 XDG_DATA_HOME="$FAKE_HOME/.local/share" \
