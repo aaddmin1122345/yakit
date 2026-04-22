@@ -6,7 +6,9 @@ set -euo pipefail
 # ==============================================================================
 
 # ---- 本地路径配置 ------------------------------------------------------------
-PROJECT_PATH="$HOME/.local/share/yakit"
+# 这里必须和 yakit.sh 里稳定映射后的真实数据目录保持一致，
+# 否则会把引擎更新到错误路径，导致 Yakit 仍然读到旧版本。
+PROJECT_PATH="$HOME/.local/share/yakit-projects"
 
 SCRIPT_REAL="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_REAL")"
